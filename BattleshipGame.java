@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.HashMap;
 import java.util.Scanner;
 
@@ -19,7 +20,7 @@ public class BattleshipGame {
 	// #endregion
 	static public List<Ship> shipList = new ArrayList<>();
 	public Scanner keyboard = new Scanner(System.in);
-	final String NOTYETSHOT = "" , MISS = "0", HIT = "H", SUNK = "X", SHIP = "S";
+	final String NOTYETSHOT = "-", MISS = "0", HIT = "H", SUNK = "X", SHIP = "S";
 
 	BattleshipGame() {
 
@@ -68,36 +69,83 @@ public class BattleshipGame {
 	void PlayerVsPlayer() {
 		System.out.println("\n\n\n\nPlayer 1's turn to input: ");
 		playerInput(player1);
-		System.out.println("Input for Player 1 completed...\nDisplaying grid: ");
+		System.out.println("Input for Player 1 completed...\nDisplaying grid: \n");
+		BattleshipGame.sleep(1000);
 		player1.showGrid();
 
-		System.out.println("\n\nDisplaying Ships: ");
+		System.out.println("\n\n\n\nPlayer 2's turn to input: ");
+		playerInput(player2);
+		System.out.println("Input for Player 2 completed...\nDisplaying grid: \n");
+		BattleshipGame.sleep(1000);
+		player2.showGrid();
 
-		for (Map.Entry<String, List<List<Coordinate>>> ships : player1.fleetList.entrySet()) {
-			System.out.println(ships.getKey() + ": ");
-			for (List<Coordinate> shipCoordinates : ships.getValue()) {
-				System.out.print("[   ");
-				for (Coordinate coord : shipCoordinates) {
-					System.out.print("[" + coord.getX() + "," + coord.getY() + "]  ");
-				}
-				System.out.println("   ]");
-			}
-		}
+		System.out.println("\nWe'll have a toss between the two players to decide who gets to shoot first:");
+		System.out.println("HEAD signifies that Player 1 wins the toss.\nTAIL signifies that Player 2 wins the toss.\n");
+		System.out.println("Press <ENTER> to continue: ");
+		keyboard.nextLine();
+		System.out.println("Performing Toss...");
+		int tossResult = performToss();
+		BattleshipGame.sleep(3000);
 
+		System.out.println("Toss result: " + (tossResult == 0 ? "HEAD" : "TAIL"));
+		Player turn = tossResult == 0 ? player1 : player2;
+
+		// displayShips(playerName);
+
+		// continue shooting and switching turns until any one of the player(s) is
+		// defeated
 		do {
-			System.out.println("Player 2's turn to shoot: ");
+
+			System.out.println("\n" + (turn.equals(player1) ? "Player 1's" : "PLayer 2's") + " turn to shoot: \n");
+
 			while (true) {
 				Coordinate shotCoordinate = inputCoordinates(9, 9);
-				String response = shoot(player2, shotCoordinate);
-				if (response.equals("valid"))
+				String response = shoot(turn, shotCoordinate);
+				if (response.equals("valid")) {
+					System.out.println("Press <ENTER> to continue...");
+					keyboard.nextLine();
 					break;
+				}
+				else {
+					System.out.println("\nEnter the co-ordinates again...\n");
+				}
 			}
+
+			if (player1.isDefeated()) {
+				System.out.println("All ships of Player 1 has been sunk...");
+				System.out.println("Winner: Player 2\nPress <ENTER> to continue...");
+				keyboard.nextLine();
+
+				System.out.println("Displaying Player 1's Grid: ");
+				player1.showGrid();
+				BattleshipGame.sleep(1000);
+
+				System.out.println("Displaying Player 2's Grid: ");
+				player2.showGrid();
+				BattleshipGame.sleep(1000);
+				break;
+			}
+
+			if (player2.isDefeated()) {
+				System.out.println("All ships of Player 2 has been sunk...");
+				System.out.println("Winner: Player 1\nPress <ENTER> to continue...");
+				keyboard.nextLine();
+
+				System.out.println("Displaying Player 2's Grid: ");
+				player2.showGrid();
+				BattleshipGame.sleep(1000);
+
+				System.out.println("Displaying Player 1's Grid: ");
+				player1.showGrid();
+				BattleshipGame.sleep(1000);
+				break;
+			}
+
+			turn = switchTurn(turn);
 
 		} while (true);
 
-		/*
-		 * System.out.println("\n\n\n\nPlayer 2's turn to input: "); playerInput();
-		 */
+		System.out.println("\nWe've come to the end of the game...\n");
 	}
 
 	/**
@@ -118,7 +166,7 @@ public class BattleshipGame {
 				currentShipList.add(currentShip);
 				updateGrid(currentPlayer, currentShip);
 
-				System.out.println("Succesfully created ship: " + name + "\nQuantity Remaining: " + quantity);
+				System.out.println("Succesfully created ship: " + name + "\nQuantity Remaining: " + quantity+"\n");
 			}
 			currentPlayer.addShipToFleet(name, currentShipList);
 		}
@@ -189,11 +237,12 @@ public class BattleshipGame {
 			for (Map.Entry<String, List<List<Coordinate>>> ships : currentPlayer.fleetList.entrySet()) {
 				for (List<Coordinate> curentShipCoords : ships.getValue()) {
 					for (Coordinate coord : curentShipCoords) {
-						System.out.println("Searching Coordinates: [" + coord.getX() + "," + coord.getY() + "]");
 						if (containsCoordinate(tempShip, coord)) {
 							validShip = false;
+
 							// gets the first matching coordinate using Stream API
 							Coordinate firstMatchingCoord = tempShip.stream().filter(e -> e.equalsCoord(coord)).findFirst().get();
+
 							// print the first matching coordinate
 							System.out.println("There's a ship already present in [" + firstMatchingCoord.getX() + ","
 									+ firstMatchingCoord.getY() + "]");
@@ -215,21 +264,18 @@ public class BattleshipGame {
 
 	String shoot(Player currentplayer, Coordinate shotCoordinate) {
 		Player opponentPlayer = getOpponentPlayer(currentplayer);
-		String coordinateValue = getValueInCoord(opponentPlayer ,shotCoordinate);
+		String coordinateValue = getValueInCoord(opponentPlayer, shotCoordinate);
 		if (coordinateValue.equals(NOTYETSHOT)) {
 			System.out.println("That's a Miss!");
 			updateGrid(opponentPlayer, shotCoordinate, MISS);
-			return "invalid";
-		}
-		else if (coordinateValue.equals(MISS)) {
+			return "valid";
+		} else if (coordinateValue.equals(MISS)) {
 			System.out.println("You've already shot there! It was a miss.");
 			return "invalid";
-		}
-		else if (coordinateValue.equals(HIT)) {
+		} else if (coordinateValue.equals(HIT)) {
 			System.out.println("You've already shot there! It was a hit.");
 			return "invalid";
-		}
-		else if (coordinateValue.equals(SUNK)) {
+		} else if (coordinateValue.equals(SUNK)) {
 			System.out.println("You've already shot there! That's one of the ships you sunk.");
 			return "invalid";
 		}
@@ -310,16 +356,49 @@ public class BattleshipGame {
 			currentPlayer.grid[x][y] = SHIP;
 		}
 	}
-	
 
-	void updateGrid(Player player, Coordinate coordinate , String value) {
+	void updateGrid(Player player, Coordinate coordinate, String value) {
 		int x = coordinate.getX();
 		int y = coordinate.getY();
 		player.grid[x][y] = value;
 	}
-	
+
 	Player getOpponentPlayer(Player currPlayer) {
 		return currPlayer == player1 ? player2 : player1;
+	}
+
+	int performToss() {
+		Random rand = new Random();
+		int randInt = rand.nextInt(9);
+		if (randInt >= 0 && randInt < 5)
+			return 0;
+		else
+			return 1;
+	}
+
+	Player switchTurn(Player currentTurn) {
+		return currentTurn.equals(player1) ? player2 : player1;
+	}
+
+	static void sleep(long milliseconds) {
+		try {
+			Thread.sleep(milliseconds);
+		} catch (InterruptedException ignored) {
+		}
+	}
+
+	void displayShips(Player currentPlayer) {
+		System.out.println("\n\nDisplaying Ships: ");
+		for (Map.Entry<String, List<List<Coordinate>>> ships : player1.fleetList.entrySet()) {
+			System.out.println(ships.getKey() + ": ");
+			for (List<Coordinate> shipCoordinates : ships.getValue()) {
+				System.out.print("[   ");
+				for (Coordinate coord : shipCoordinates) {
+					System.out.print("[" + coord.getX() + "," + coord.getY() + "]  ");
+				}
+				System.out.println("   ]");
+			}
+		}
 	}
 
 	public static void main(String args[]) {
@@ -381,30 +460,65 @@ class Player {
 	Player() {
 		this.grid = makeGrid();
 		this.totalShips = 10;
-		this.lifeRemaining = 5;
 	}
 
 	String[][] makeGrid() {
 		String toReturn[][] = new String[ROWS][COLUMNS];
 		for (int i = 0; i < ROWS; i++) {
 			for (int j = 0; j < COLUMNS; j++) {
-				toReturn[i][j] = "";
+				toReturn[i][j] = "-";
 			}
 		}
 		return toReturn;
 	}
 
 	void showGrid() {
-		for (int i = 0; i < ROWS; i++) {
-			for (int j = 0; j < COLUMNS; j++) {
-				System.out.print(this.grid[j][i] + "\t");
-			}
-			System.out.println();
+
+		printLines();
+		StringBuffer str = new StringBuffer("");
+		// printing the indices
+		for (int i = 0; i < COLUMNS; i++) {
+			str.append("| ").append(i).append(" ");
 		}
+		str.append("|   |");
+
+		System.out.println(str.toString());
+		printLines();
+
+		for (int i = 0; i < ROWS; i++) {
+			str = str.delete(0, str.length());
+			for (int j = 0; j < COLUMNS; j++) {
+				str.append("| ").append(this.grid[i][j]).append(" ");
+			}
+			str.append("| ").append(i).append(" |\n");
+			System.out.print(str.toString());
+			printLines();
+		}
+	}
+
+	void printLines() {
+		for (int i = 0; i < 45; i++) {
+			System.err.print("-");
+		}
+		System.out.println();
 	}
 
 	void addShipToFleet(String shipName, List<List<Coordinate>> newShipCoord) {
 		this.fleetList.put(shipName, newShipCoord);
+	}
+
+	boolean isDefeated() {
+		for (int i = 0; i < ROWS; i++) {
+			for (int j = 0; j < COLUMNS; j++) {
+				// S denotes a ship in the grid.
+				// If the following condition is never true, it means that all ships in the grid
+				// have been sunk
+				// and the player invoking this function is defeated;
+				if (this.grid[i][j].equals("S"))
+					return false;
+			}
+		}
+		return true;
 	}
 }
 
